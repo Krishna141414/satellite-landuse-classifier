@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Satellite Land-Use Classifier</title>
+<style>
+  :root {
+    --bg: #0B1020; --blue: #4F7CFF; --pink: #FF3D81; --gold: #FFB020; --mint: #22D3B6;
+    --text: #E8ECF8; --muted: #9AA3BF; --card: rgba(255,255,255,0.05); --border: rgba(255,255,255,0.10);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.55;
+    background-image: radial-gradient(circle at 15% 10%, rgba(79,124,255,.18), transparent 40%),
+                      radial-gradient(circle at 85% 30%, rgba(255,61,129,.12), transparent 40%);
+    background-attachment: fixed;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px 60px; }
+  .hero {
+    margin: 28px 0 24px; padding: 44px 28px; border-radius: 24px; text-align: center;
+    background: linear-gradient(120deg, var(--blue), var(--pink));
+    box-shadow: 0 20px 60px rgba(79,124,255,.25);
+  }
+  .hero h1 { margin: 0 0 8px; font-size: clamp(1.7rem, 4.5vw, 2.8rem); letter-spacing: -.02em; }
+  .hero p { margin: 0 auto; max-width: 640px; opacity: .92; }
+  .chips { margin-top: 18px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .chip { background: rgba(11,16,32,.35); padding: 6px 14px; border-radius: 999px; font-size: .9rem; font-weight: 600; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 22px;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); margin-bottom: 22px;
+  }
+  h2 { margin: 0 0 14px; font-size: 1.25rem; }
+  h2 .accent { color: var(--gold); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  .grid > *, .figs > * { min-width: 0; }
+  .drop {
+    display: block; border: 2px dashed rgba(79,124,255,.5); border-radius: 16px; padding: 18px; text-align: center;
+    cursor: pointer; transition: border-color .2s, background .2s;
+  }
+  .drop:hover, .drop.over { border-color: var(--mint); background: rgba(34,211,182,.06); }
+  .drop input { display: none; }
+  #preview {
+    width: 100%; max-width: 260px; aspect-ratio: 1; object-fit: cover; border-radius: 14px;
+    image-rendering: pixelated; display: block; margin: 0 auto 10px; background: rgba(255,255,255,.04);
+  }
+  .muted { color: var(--muted); font-size: .92rem; }
+  .samples { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 14px; }
+  .samples button {
+    padding: 0; border: 2px solid transparent; border-radius: 10px; overflow: hidden; cursor: pointer;
+    background: none; transition: transform .15s, border-color .15s;
+  }
+  .samples button:hover { transform: translateY(-2px); border-color: var(--gold); }
+  .samples img { width: 100%; display: block; aspect-ratio: 1; image-rendering: pixelated; }
+  .pred { margin-bottom: 16px; }
+  .pred .row { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 6px; }
+  .bar { height: 14px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .fill { height: 100%; width: 0; border-radius: 999px; transition: width .9s cubic-bezier(.2,.8,.2,1); }
+  .pred:nth-child(1) .fill { background: linear-gradient(90deg, var(--blue), var(--pink)); }
+  .pred:nth-child(2) .fill { background: var(--gold); }
+  .pred:nth-child(3) .fill { background: var(--mint); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .stat { text-align: center; padding: 16px; border-radius: 16px; background: rgba(255,255,255,.04); }
+  .stat b { display: block; font-size: 1.8rem; }
+  .stat:nth-child(1) b { color: var(--mint); }
+  .stat:nth-child(2) b { color: var(--gold); }
+  .stat:nth-child(3) b { color: var(--blue); }
+  .figs img { width: 100%; border-radius: 14px; background: #fff; display: block; }
+  .figs { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; align-items: start; }
+  ul { padding-left: 20px; margin: 0; }
+  li { margin-bottom: 6px; }
+  li::marker { color: var(--pink); }
+  footer { text-align: center; color: var(--muted); font-size: .85rem; }
+  @media (max-width: 760px) {
+    .grid, .figs { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: 1fr; }
+    .hero { padding: 32px 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <h1>Satellite Land-Use Classifier</h1>
+    <p>A MobileNetV3-Small fine-tuned on EuroSAT Sentinel-2 tiles. Upload a satellite image or pick a sample to see what the network thinks it is. Everything runs in your browser.</p>
+    <div class="chips"><span class="chip">10 classes</span><span class="chip">27,000 images</span><span class="chip">ONNX in the browser</span></div>
+  </header>
+
+  <section class="grid">
+    <div class="card">
+      <h2>1. Choose an <span class="accent">image</span></h2>
+      <label class="drop" id="drop">
+        <img id="preview" alt="Selected image preview">
+        <input type="file" id="file" accept="image/*">
+        <div><b>Click or drop an image here</b></div>
+        <div class="muted">Works best on 64&times;64-style top-down Sentinel-2 RGB tiles</div>
+      </label>
+      <div class="muted" style="margin-top:14px">Or try an unseen test tile:</div>
+      <div class="samples" id="samples"></div>
+    </div>
+    <div class="card">
+      <h2>2. Top-3 <span class="accent">predictions</span></h2>
+      <div id="status" class="muted">Loading model…</div>
+      <div id="preds"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Results on the <span class="accent">unseen test set</span></h2>
+    <div class="stats">
+      <div class="stat"><b id="acc">–</b><span class="muted">accuracy</span></div>
+      <div class="stat"><b id="f1">–</b><span class="muted">macro F1</span></div>
+      <div class="stat"><b id="ntest">–</b><span class="muted">test images</span></div>
+    </div>
+    <div class="figs" style="margin-top:18px">
+      <img src="training_curves.png" alt="Training and validation loss and accuracy per epoch">
+      <img src="confusion_matrix.png" alt="Confusion matrix on the test set">
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>How it <span class="accent">works</span></h2>
+      <ul>
+        <li><b>Data:</b> EuroSAT RGB (Helber et al., 2019) – 27,000 64&times;64 Sentinel-2 tiles, 10 classes. Stratified 70/15/15 train/val/test split.</li>
+        <li><b>Model:</b> MobileNetV3-Small pretrained on ImageNet, last layer replaced by a 10-class head (~1.5M params).</li>
+        <li><b>Training:</b> first only the head (backbone frozen), then all layers with a 10&times; lower learning rate. AdamW, random flips, early stopping on validation loss.</li>
+        <li><b>Demo:</b> model exported to ONNX and run with onnxruntime-web. Your image is resized to 224&times;224 and normalised in the browser, so nothing is uploaded.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2><span class="accent">Limitations</span></h2>
+      <ul>
+        <li>Trained only on European Sentinel-2 RGB tiles (~10 m/pixel). Photos from other sensors, zoom levels or regions may be misclassified.</li>
+        <li>Always picks one of 10 classes – it cannot say “none of these” (e.g. a city photo or a cat).</li>
+        <li>Uses RGB only; the 13-band multispectral data would separate crops and vegetation better.</li>
+        <li>Similar-looking classes cause most errors: Annual Crop vs. Permanent Crop / Pasture, and Highway vs. River (thin linear features).</li>
+        <li>Test images come from the same dataset, so real-world accuracy is likely lower.</li>
+      </ul>
+    </div>
+  </section>
+  <footer>Dataset: Helber et al., “EuroSAT”, IEEE JSTARS 2019 · Built with PyTorch &amp; onnxruntime-web</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const PRETTY = {
+    AnnualCrop: "Annual Crop", HerbaceousVegetation: "Herbaceous Vegetation", PermanentCrop: "Permanent Crop",
+    SeaLake: "Sea / Lake"
+  };
+  const pretty = c => PRETTY[c] || c;
+  let session, meta;
+
+  // Load metadata (classes, normalisation, test metrics) and the ONNX model.
+  async function init() {
+    ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
+    meta = await (await fetch("meta.json")).json();
+    $("acc").textContent = (meta.test_accuracy * 100).toFixed(2) + "%";
+    $("f1").textContent = meta.macro_f1.toFixed(3);
+    $("ntest").textContent = meta.n_test.toLocaleString();
+    meta.classes.forEach(c => {
+      const b = document.createElement("button");
+      b.title = pretty(c);
+      b.innerHTML = `<img src="samples/${c}.jpg" alt="${pretty(c)} sample">`;
+      b.onclick = () => classify(`samples/${c}.jpg`);
+      $("samples").appendChild(b);
+    });
+    session = await ort.InferenceSession.create("model.onnx", { executionProviders: ["wasm"] });
+    $("status").textContent = "Model ready – pick an image.";
+    classify(`samples/${meta.classes[0]}.jpg`);
+  }
+
+  // Centre-crop to a square, resize to 224x224, normalise with ImageNet mean/std -> NCHW tensor.
+  function toTensor(img) {
+    const S = meta.img_size, cv = document.createElement("canvas");
+    cv.width = cv.height = S;
+    const ctx = cv.getContext("2d");
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, S, S);
+    const px = ctx.getImageData(0, 0, S, S).data, data = new Float32Array(3 * S * S);
+    for (let i = 0; i < S * S; i++)
+      for (let c = 0; c < 3; c++)
+        data[c * S * S + i] = (px[i * 4 + c] / 255 - meta.mean[c]) / meta.std[c];
+    return new ort.Tensor("float32", data, [1, 3, S, S]);
+  }
+
+  async function classify(src) {
+    if (!session) return;
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    $("preview").src = src;
+    $("status").textContent = "Thinking…";
+    const out = await session.run({ input: toTensor(img) });
+    const logits = Array.from(out.logits.data), max = Math.max(...logits);
+    const exps = logits.map(l => Math.exp(l - max)), sum = exps.reduce((a, b) => a + b);
+    const top = exps.map((e, i) => ({ c: meta.classes[i], p: e / sum })).sort((a, b) => b.p - a.p).slice(0, 3);
+    $("status").textContent = "";
+    $("preds").innerHTML = top.map(t => `
+      <div class="pred"><div class="row"><span>${pretty(t.c)}</span><span>${(t.p * 100).toFixed(1)}%</span></div>
+      <div class="bar"><div class="fill" data-w="${t.p * 100}"></div></div></div>`).join("");
+    requestAnimationFrame(() => requestAnimationFrame(() =>
+      document.querySelectorAll(".fill").forEach(f => f.style.width = f.dataset.w + "%")));
+  }
+
+  // Upload / drag-and-drop
+  const useFile = f => f && f.type.startsWith("image/") && classify(URL.createObjectURL(f));
+  $("file").onchange = e => useFile(e.target.files[0]);
+  const drop = $("drop");
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); useFile(e.dataTransfer.files[0]); };
+
+  init().catch(err => { $("status").textContent = "Could not load model: " + err.message; console.error(err); });
+</script>
+</body>
+</html>
