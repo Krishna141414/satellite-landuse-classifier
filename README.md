@@ -3,7 +3,7 @@
 Classifies 64×64 Sentinel-2 satellite tiles into 10 land-use classes with a fine-tuned **MobileNetV3-Small**.
 It reaches **98.32% accuracy on an unseen test set**. A static web demo runs the model in the browser with ONNX.
 
-**Live demo:** https://satellite-landuse-classifier.onrender.com *(Render Static Site; update this link if Render assigns a different name)*
+**Live demo:** https://satellite-landuse-classifier.onrender.com
 
 ## Problem
 The task is image classification. Given a satellite image tile, the model predicts what the land is used for: AnnualCrop, Forest, HerbaceousVegetation, Highway, Industrial, Pasture, PermanentCrop, Residential, River or SeaLake. Classifiers like this are used for land-cover mapping, monitoring urban growth and agriculture statistics.
